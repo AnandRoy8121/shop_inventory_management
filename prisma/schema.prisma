@@ -1,0 +1,309 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  MANAGER
+  CASHIER
+}
+
+enum MovementType {
+  PURCHASE           // Stock in from supplier/vendor
+  SALE               // Stock deducted via checkout
+  SALE_REVERSAL      // Stock restored from cancelled/refunded sale
+  MANUAL_ADJUSTMENT  // Physical inventory count correction / shrinkage / damage
+  RETURN             // Customer return (stocked back)
+  RETURN_REVERSAL    // Return cancellation
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  REFUNDED
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  UPI_QR
+  BANK_TRANSFER
+  STORE_CREDIT
+  OTHER
+}
+
+model User {
+  id               String              @id @default(cuid())
+  name             String
+  email            String              @unique
+  passwordHash     String
+  role             Role                @default(CASHIER)
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  // Sales relationships
+  sales            Sale[]              @relation("SaleCreatedBy")
+  cancelledSales   Sale[]              @relation("SaleCancelledBy")
+  movements        InventoryMovement[]
+  auditLogs        AuditLog[]
+  paymentsReceived Payment[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+model Shop {
+  id              String    @id @default(cuid())
+  name            String
+  legalName       String?
+  phone           String?
+  email           String?
+  address         String?
+  currencySymbol  String    @default("$")
+  currencyCode    String    @default("USD")
+  taxRatePercent  Decimal   @default(0.00) @db.Decimal(5, 2)
+  invoicePrefix   String    @default("INV")
+  receiptFooter   String?   @default("Thank you for shopping with us!")
+  lowStockDefault Int       @default(5)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sales           Sale[]
+
+  @@index([name])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model Product {
+  id              String              @id @default(cuid())
+  sku             String              @unique
+  barcode         String?             @unique
+  name            String
+  description     String?
+  categoryId      String?
+  category        Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Financial values
+  costPrice       Decimal             @db.Decimal(12, 2) // Purchase / acquisition cost
+  purchasePrice   Decimal?            @db.Decimal(12, 2) // Optional purchase price alias
+  sellingPrice    Decimal             @db.Decimal(12, 2) // Retail selling price
+
+  // Stock tracking
+  stock           Int                 @default(0)        // Current stock balance (must stay >= 0)
+  minStockAlert   Int                 @default(5)        // Minimum stock alert threshold
+
+  unit            String              @default("pcs")    // Unit of measurement (e.g. pcs, kg, box, pack)
+  imageUrl        String?                                // Product image URL
+
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+
+  saleItems       SaleItem[]
+  movements       InventoryMovement[]
+
+  @@index([sku])
+  @@index([barcode])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([stock])
+}
+
+model Customer {
+  id          String    @id @default(cuid())
+  name        String
+  phone       String?   @unique
+  email       String?
+  address     String?
+  notes       String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sales       Sale[]
+
+  @@index([phone])
+  @@index([name])
+  @@index([isActive])
+}
+
+model Sale {
+  id                  String              @id @default(cuid())
+  invoiceNumber       String              @unique // Sequential e.g. INV-2026-0001
+  saleNumber          String?             @unique // Unique sale number alias
+
+  shopId              String?             // Shop relation
+  shop                Shop?               @relation(fields: [shopId], references: [id], onDelete: Restrict)
+
+  userId              String              // Cashier/staff who made the sale (createdBy)
+  user                User                @relation("SaleCreatedBy", fields: [userId], references: [id], onDelete: Restrict)
+
+  customerId          String?
+  customer            Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  subtotal            Decimal             @db.Decimal(12, 2)
+  discount            Decimal             @default(0.00) @db.Decimal(12, 2)
+  discountAmount      Decimal             @default(0.00) @db.Decimal(12, 2)
+  tax                 Decimal             @default(0.00) @db.Decimal(12, 2)
+  taxAmount           Decimal             @default(0.00) @db.Decimal(12, 2)
+  total               Decimal             @default(0.00) @db.Decimal(12, 2)
+  grandTotal          Decimal             @db.Decimal(12, 2)
+
+  paymentStatus       PaymentStatus       @default(PAID)
+  status              SaleStatus          @default(COMPLETED)
+  paymentMethod       PaymentMethod       @default(CASH)
+
+  notes               String?
+  cancellationReason  String?
+  cancelledAt         DateTime?
+  cancelledById       String?             // User ID who authorized cancellation
+  cancelledBy         User?               @relation("SaleCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  items               SaleItem[]
+  payments            Payment[]
+  movements           InventoryMovement[]
+
+  @@index([invoiceNumber])
+  @@index([saleNumber])
+  @@index([shopId])
+  @@index([userId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+}
+
+model SaleItem {
+  id              String    @id @default(cuid())
+  saleId          String
+  sale            Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  productName     String    // Preserves product name at sale moment
+  sku             String    // Preserves SKU at sale moment
+  quantity        Int
+  costPrice       Decimal   @default(0.00) @db.Decimal(12, 2) // Unit cost at checkout (for exact COGS)
+  unitPrice       Decimal   @db.Decimal(12, 2) // Unit retail price
+  discount        Decimal   @default(0.00) @db.Decimal(12, 2) // Line item discount
+  tax             Decimal   @default(0.00) @db.Decimal(12, 2) // Line item tax
+  subtotal        Decimal   @db.Decimal(12, 2) // (quantity * unitPrice)
+  total           Decimal   @default(0.00) @db.Decimal(12, 2) // subtotal - discount + tax
+
+  createdAt       DateTime  @default(now())
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model InventoryMovement {
+  id              String        @id @default(cuid())
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantityChange  Int           // Signed: positive (+10) or negative (-2)
+  stockBefore     Int           // Product stock immediately prior to mutation
+  stockAfter      Int           // Product stock immediately following mutation
+
+  type            MovementType  // PURCHASE, SALE, SALE_REVERSAL, MANUAL_ADJUSTMENT, RETURN, RETURN_REVERSAL
+  referenceId     String?       // ID of Sale, PO, or Adjustment
+  referenceType   String?       // "SALE", "ADJUSTMENT", "PURCHASE", "RETURN"
+
+  reason          String?       // E.g. "Counter Sale INV-001", "Supplier intake", "Shrinkage write-off"
+  userId          String        // Performed by user ID
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  saleId          String?
+  sale            Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime      @default(now())
+
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([referenceId])
+  @@index([userId])
+}
+
+model Payment {
+  id             String         @id @default(cuid())
+  saleId         String
+  sale           Sale           @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  amount         Decimal        @db.Decimal(12, 2)
+  method         PaymentMethod  @default(CASH)
+  status         PaymentStatus  @default(PAID)
+  transactionRef String?        // UPI txn ID, Card auth code, check number
+  notes          String?
+  receivedById   String?
+  receivedBy     User?          @relation(fields: [receivedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([saleId])
+  @@index([method])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String    // e.g. "PRODUCT_CREATED", "PRODUCT_UPDATED", "PRODUCT_DEACTIVATED", "INVENTORY_ADJUSTED", "SALE_CREATED", "SALE_CANCELLED", "SALE_RETURNED", "SETTINGS_CHANGED"
+  entity      String    // e.g. "Product", "Sale", "Inventory", "Shop", "ShopSettings"
+  entityId    String?
+  metadata    Json?     // Diff / payload details
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([action])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ShopSettings {
+  id              String    @id @default("default")
+  shopName        String    @default("Apex Retail Store")
+  currencySymbol  String    @default("$")
+  currencyCode    String    @default("USD")
+  taxRatePercent  Decimal   @default(0.00) @db.Decimal(5, 2)
+  invoicePrefix   String    @default("INV")
+  receiptFooter   String?   @default("Thank you for shopping with us!")
+  lowStockDefault Int       @default(5)
+  updatedAt       DateTime  @updatedAt
+}
