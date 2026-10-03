@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.AUTH_SECRET || 'super-secret-inventory-jwt-key-change-in-production-2026-xyz'
-);
-
-const SESSION_COOKIE_NAME = 'apex_inventory_session';
+const AUTH_SECRET = process.env.AUTH_SECRET || 'shop-inventory-super-secret-key-at-least-32-chars-long';
+const SECRET_KEY = new TextEncoder().encode(AUTH_SECRET);
+const SESSION_COOKIE_NAME = 'shop_session';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -33,7 +31,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Requirement 8: Redirect authenticated users visiting /login to the dashboard
+  // Redirect authenticated users visiting /login to dashboard
   if (isValidSession && pathname === '/login') {
     return NextResponse.redirect(new URL('/', request.url));
   }
@@ -43,7 +41,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Requirement 7: Redirect unauthenticated users visiting protected routes to login
+  // Redirect unauthenticated users visiting protected routes to /login
   if (!isValidSession) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('from', pathname);

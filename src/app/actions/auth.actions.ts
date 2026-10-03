@@ -1,31 +1,29 @@
 'use server';
 
 import { loginSchema } from '@/schemas/auth.schema';
-import { authService } from '@/services/auth.service';
-import { ActionResult, successResult, handleActionError } from '@/lib/errors';
-import { revalidatePath } from 'next/cache';
+import { verifyCredentials, createSessionToken, setAuthCookie, clearAuthCookie } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
-export async function loginAction(data: unknown): Promise<ActionResult<{ redirectUrl: string }>> {
+export async function loginAction(data: unknown) {
   try {
-    const validated = loginSchema.parse(data);
-    await authService.login(validated);
-    revalidatePath('/', 'layout');
-    return successResult({ redirectUrl: '/' });
-  } catch (err) {
-    return handleActionError(err);
+    const { email, password } = loginSchema.parse(data);
+    const user = await verifyCredentials(email, password);
+
+    if (!user) {
+      return { success: false, error: 'Invalid email or password' };
+    }
+
+    const token = await createSessionToken(user);
+    await setAuthCookie(token);
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Login failed';
+    return { success: false, error: message };
   }
 }
 
-export async function logoutAction(): Promise<ActionResult> {
-  try {
-    await authService.logout();
-    revalidatePath('/', 'layout');
-    return successResult(undefined);
-  } catch (err) {
-    return handleActionError(err);
-  }
-}
-
-export async function getCurrentUserAction() {
-  return authService.getCurrentUser();
+export async function logoutAction() {
+  await clearAuthCookie();
+  redirect('/login');
 }

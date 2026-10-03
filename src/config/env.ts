@@ -10,6 +10,11 @@ const envSchema = z.object({
     .url('NEXT_PUBLIC_APP_URL must be a valid URL')
     .default('http://localhost:3000'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  DIRECT_URL: z.string().optional(),
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
+  SUPABASE_SECRET_KEY: z.string().optional(),
+  SUPABASE_JWKS_URL: z.string().optional(),
 });
 
 const parseEnv = () => {
@@ -18,6 +23,11 @@ const parseEnv = () => {
     AUTH_SECRET: process.env.AUTH_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NODE_ENV: process.env.NODE_ENV,
+    DIRECT_URL: process.env.DIRECT_URL,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
+    SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
+    SUPABASE_JWKS_URL: process.env.SUPABASE_JWKS_URL,
   });
 
   if (!result.success) {

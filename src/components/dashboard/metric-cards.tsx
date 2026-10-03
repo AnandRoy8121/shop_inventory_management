@@ -1,70 +1,92 @@
 import Link from 'next/link';
-import { DollarSign, TrendingUp, ShoppingBag, AlertTriangle, AlertOctagon, ArrowUpRight } from 'lucide-react';
+import {
+  ShoppingCart,
+  Boxes,
+  Package,
+  PackagePlus,
+  FolderTree,
+  AlertTriangle,
+  ArrowUpRight,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatCurrency } from '@/lib/decimal';
 
 interface MetricCardsProps {
-  metrics: {
-    totalRevenue: number;
-    grossProfit: number;
-    profitMarginPercent: number;
-    totalOrders: number;
-    totalItemsSold: number;
-    averageOrderValue: number;
+  totalSales: number;
+  productsSold: number;
+  productsAdded: number;
+  inventorySummary: {
+    totalProducts: number;
+    totalStockUnits: number;
     lowStockCount: number;
     outOfStockCount: number;
   };
-  currencySymbol?: string;
 }
 
-export function MetricCards({ metrics, currencySymbol = '$' }: MetricCardsProps) {
+export function MetricCards({
+  totalSales,
+  productsSold,
+  productsAdded,
+  inventorySummary,
+}: MetricCardsProps) {
   const cards = [
     {
-      title: 'Total Revenue',
-      value: formatCurrency(metrics.totalRevenue, currencySymbol),
-      subtitle: `${metrics.totalOrders} completed orders`,
-      icon: DollarSign,
+      title: 'Total Sales',
+      value: totalSales,
+      subtitle: 'Recorded transactions',
+      icon: ShoppingCart,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
+      href: '/sales',
     },
     {
-      title: 'Gross Profit',
-      value: formatCurrency(metrics.grossProfit, currencySymbol),
-      subtitle: `${metrics.profitMarginPercent}% margin`,
-      icon: TrendingUp,
+      title: 'Units Sold',
+      value: productsSold,
+      subtitle: 'Items dispatched',
+      icon: Package,
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
+      href: '/reports',
+    },
+    {
+      title: 'Units Added',
+      value: `+${productsAdded}`,
+      subtitle: 'Inward intake received',
+      icon: PackagePlus,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
+      href: '/reports',
     },
     {
-      title: 'Average Order Value',
-      value: formatCurrency(metrics.averageOrderValue, currencySymbol),
-      subtitle: `${metrics.totalItemsSold} items sold`,
-      icon: ShoppingBag,
+      title: 'Current Stock',
+      value: `${inventorySummary.totalStockUnits} units`,
+      subtitle: 'On hand inventory',
+      icon: Boxes,
       color: 'text-cyan-600',
       bg: 'bg-cyan-50',
+      href: '/inventory',
     },
     {
-      title: 'Low Stock Products',
-      value: metrics.lowStockCount,
-      subtitle: 'At or below threshold',
+      title: 'Catalog Size',
+      value: `${inventorySummary.totalProducts} items`,
+      subtitle: 'Active product types',
+      icon: FolderTree,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+      href: '/products',
+    },
+    {
+      title: 'Stock Alerts',
+      value: inventorySummary.lowStockCount + inventorySummary.outOfStockCount,
+      subtitle: `${inventorySummary.outOfStockCount} out of stock, ${inventorySummary.lowStockCount} low`,
       icon: AlertTriangle,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50',
-      href: '/inventory?filter=low_stock',
-    },
-    {
-      title: 'Out of Stock Products',
-      value: metrics.outOfStockCount,
-      subtitle: 'Zero units remaining',
-      icon: AlertOctagon,
-      color: 'text-rose-600',
-      bg: 'bg-rose-50',
-      href: '/inventory?filter=out_of_stock',
+      color: inventorySummary.outOfStockCount > 0 ? 'text-rose-600' : 'text-amber-600',
+      bg: inventorySummary.outOfStockCount > 0 ? 'bg-rose-50' : 'bg-amber-50',
+      href: '/inventory',
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
       {cards.map((c) => {
         const content = (
           <Card
@@ -73,22 +95,22 @@ export function MetricCards({ metrics, currencySymbol = '$' }: MetricCardsProps)
               c.href ? 'hover:border-slate-300 hover:shadow-md cursor-pointer' : ''
             }`}
           >
-            <CardContent className="p-4 sm:p-5">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1">
                     <p className="text-xs font-medium text-slate-500 truncate">{c.title}</p>
-                    {c.href && <ArrowUpRight className="h-3 w-3 text-slate-400" />}
+                    {c.href && <ArrowUpRight className="h-3 w-3 text-slate-400 shrink-0" />}
                   </div>
-                  <h4 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">
+                  <h4 className="mt-1 text-xl font-bold tracking-tight text-slate-900 truncate">
                     {c.value}
                   </h4>
-                  <p className="mt-1 text-[11px] font-medium text-slate-400 truncate">{c.subtitle}</p>
+                  <p className="mt-0.5 text-[11px] font-medium text-slate-400 truncate">{c.subtitle}</p>
                 </div>
                 <div
-                  className={`flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${c.bg} ${c.color}`}
+                  className={`ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.bg} ${c.color}`}
                 >
-                  <c.icon className="h-5 w-5" />
+                  <c.icon className="h-4 w-4" />
                 </div>
               </div>
             </CardContent>

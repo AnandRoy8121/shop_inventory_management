@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { loginAction } from '@/app/actions/auth.actions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Store, AlertCircle, Sparkles } from 'lucide-react';
+import { Store, AlertCircle } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -15,26 +15,65 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const queryError = searchParams.get('error');
+  const activeError = error || queryError;
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setError(null);
 
     startTransition(async () => {
-      const res = await loginAction({ email, password });
-      if (!res.success) {
-        setError(res.error);
-      } else {
-        const from = searchParams.get('from') || '/';
-        router.push(from);
-        router.refresh();
+      const cleanEmail = email.trim().toLowerCase();
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: cleanEmail, password }),
+          credentials: 'include',
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          setError(data.error || 'Invalid email or password');
+          return;
+        }
+
+        // Explicitly set cookie on client to ensure mobile Safari/Chrome sync before navigation
+        if (data.token) {
+          document.cookie = `shop_session=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        }
+
+        let from = searchParams.get('from') || '/';
+        if (from.startsWith('/login')) {
+          from = '/';
+        }
+
+        window.location.replace(from);
+      } catch (err: unknown) {
+        // Fallback to server action if fetch fails
+        try {
+          const actionRes = await loginAction({ email: cleanEmail, password });
+          if (!actionRes.success) {
+            setError(actionRes.error || 'Invalid email or password');
+          } else {
+            let from = searchParams.get('from') || '/';
+            if (from.startsWith('/login')) {
+              from = '/';
+            }
+            window.location.replace(from);
+          }
+        } catch (actionErr: unknown) {
+          setError(
+            actionErr instanceof Error
+              ? actionErr.message
+              : 'Login failed. Please check network/credentials.'
+          );
+        }
       }
     });
-  };
-
-  const handleQuickFill = (userEmail: string, userPass: string) => {
-    setEmail(userEmail);
-    setPassword(userPass);
-    setError(null);
   };
 
   return (
@@ -44,22 +83,31 @@ function LoginForm() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200">
           <Store className="h-6 w-6" />
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">Apex Retail Hub</h2>
+        <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">Gangga Aqua</h2>
         <p className="mt-1 text-xs text-slate-500">
-          Secure inventory, point-of-sale & audit management
+          Sign in to manage your inventory, record sales, and view reports
         </p>
       </div>
 
-      {/* Login Form */}
-      <form onSubmit={handleLogin} className="mt-6 space-y-4">
+      {/* Login Form with Progressive Enhancement */}
+      <form
+        method="POST"
+        action="/api/auth/login"
+        onSubmit={handleLogin}
+        className="mt-6 space-y-4"
+      >
         <div>
           <label className="text-xs font-semibold text-slate-700 block mb-1">Email Address</label>
           <Input
+            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="e.g. admin@apexretail.com"
+            placeholder="e.g. admin@ganggaaqua.com"
             required
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="email"
             autoFocus
           />
         </div>
@@ -67,18 +115,22 @@ function LoginForm() {
         <div>
           <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
           <Input
+            name="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="current-password"
           />
         </div>
 
-        {error && (
+        {activeError && (
           <div className="flex items-center gap-1.5 rounded-lg bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+            <span>{activeError}</span>
           </div>
         )}
 
@@ -87,55 +139,9 @@ function LoginForm() {
           isLoading={isPending}
           className="w-full bg-indigo-600 hover:bg-indigo-700 font-semibold py-2.5 shadow-sm"
         >
-          Sign In to Store
+          Sign In to Gangga Aqua
         </Button>
       </form>
-
-      {/* Demo Quick-Fill Credentials */}
-      <div className="mt-6 border-t border-slate-100 pt-5">
-        <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium mb-2.5">
-          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-          <span>Instant Demo Logins:</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickFill('admin@apexretail.com', 'admin123')}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-[11px] font-medium text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-800 transition"
-          >
-            <span className="font-bold block text-slate-900">Admin</span>
-            Full Control
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickFill('staff@apexretail.com', 'staff123')}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-[11px] font-medium text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-800 transition"
-          >
-            <span className="font-bold block text-slate-900">Staff</span>
-            Sales & Inventory
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickFill('manager@apexretail.com', 'manager123')}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-[11px] font-medium text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-800 transition"
-          >
-            <span className="font-bold block text-slate-900">Manager</span>
-            Stock & Operations
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickFill('cashier@apexretail.com', 'cashier123')}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-[11px] font-medium text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-800 transition"
-          >
-            <span className="font-bold block text-slate-900">Cashier</span>
-            POS Terminal
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

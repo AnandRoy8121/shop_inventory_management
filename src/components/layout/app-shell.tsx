@@ -3,14 +3,13 @@
 import React, { useState } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
+import { BottomNav } from './bottom-nav';
 import { ToastProvider } from '@/components/shared/toast';
-import { Role } from '@prisma/client';
 
 export interface AppShellProps {
   user: {
     name: string;
     email: string;
-    role: Role;
   };
   shopName?: string;
   lowStockCount?: number;
@@ -19,7 +18,7 @@ export interface AppShellProps {
 
 export function AppShell({
   user,
-  shopName = 'Apex Retail Hub',
+  shopName = 'Gangga Aqua',
   lowStockCount = 0,
   children,
 }: AppShellProps) {
@@ -46,8 +45,11 @@ export function AppShell({
             onMenuToggle={() => setMobileNavOpen(true)}
           />
 
-          {/* Main Work Area */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">{children}</main>
+          {/* Main Work Area with mobile bottom padding */}
+          <main className="flex-1 p-3.5 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto pb-24 lg:pb-8">{children}</main>
+
+          {/* Mobile Sticky Bottom Navigation */}
+          <BottomNav lowStockCount={lowStockCount} />
         </div>
       </div>
     </ToastProvider>

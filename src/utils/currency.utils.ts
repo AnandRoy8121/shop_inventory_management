@@ -14,11 +14,11 @@ export function toDecimal(val: NumericValue | null | undefined): Decimal {
 
 export function formatCurrency(
   val: NumericValue | null | undefined,
-  symbol = '$',
+  symbol = '₹',
   decimals = 2
 ): string {
   const num = toDecimal(val).toDecimalPlaces(decimals).toNumber();
-  return `${symbol}${num.toLocaleString('en-US', {
+  return `${symbol}${num.toLocaleString('en-IN', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;

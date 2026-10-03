@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Apex Retail Hub - Inventory & Shop Management',
+  title: 'Gangga Aqua - Inventory & Shop Management',
   description:
-    'Production-grade retail point-of-sale, double-entry inventory movement ledger, and profit analytics.',
+    'Point-of-sale, stock tracking, and profit analytics for Gangga Aqua.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -3,41 +3,33 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Product, Category } from '@prisma/client';
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  ExternalLink,
-} from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/decimal';
 
 interface LowStockProductListProps {
-  outOfStock: Array<Product & { category?: Category | null }>;
-  lowStock: Array<Product & { category?: Category | null }>;
-  currencySymbol?: string;
+  products: Array<
+    Omit<Product, 'purchasePrice' | 'sellingPrice'> & {
+      purchasePrice: number | any;
+      sellingPrice: number | any;
+      category?: Category | null;
+    }
+  >;
 }
 
-export function LowStockProductList({
-  outOfStock,
-  lowStock,
-  currencySymbol = '$',
-}: LowStockProductListProps) {
+export function LowStockProductList({ products }: LowStockProductListProps) {
   const [filter, setFilter] = useState<'ALL' | 'OUT_OF_STOCK' | 'LOW_STOCK'>('ALL');
 
-  const allAlertProducts = [
-    ...outOfStock.map((p) => ({ ...p, alertStatus: 'OUT_OF_STOCK' as const })),
-    ...lowStock.map((p) => ({ ...p, alertStatus: 'LOW_STOCK' as const })),
-  ];
+  const outOfStock = products.filter((p) => p.stock <= 0);
+  const lowStock = products.filter((p) => p.stock > 0 && p.stock <= p.minStock);
 
-  const displayedProducts = allAlertProducts.filter((p) => {
-    if (filter === 'OUT_OF_STOCK') return p.alertStatus === 'OUT_OF_STOCK';
-    if (filter === 'LOW_STOCK') return p.alertStatus === 'LOW_STOCK';
+  const displayedProducts = products.filter((p) => {
+    if (filter === 'OUT_OF_STOCK') return p.stock <= 0;
+    if (filter === 'LOW_STOCK') return p.stock > 0 && p.stock <= p.minStock;
     return true;
   });
 
-  const totalCount = allAlertProducts.length;
+  const totalCount = products.length;
 
   return (
     <Card className="border border-slate-200 shadow-xs overflow-hidden">
@@ -52,7 +44,7 @@ export function LowStockProductList({
             </CardTitle>
             <p className="text-xs text-slate-500">
               {totalCount === 0
-                ? 'All inventory items are above minimum thresholds'
+                ? 'All inventory items are operating above minimum thresholds'
                 : `${totalCount} item${totalCount === 1 ? '' : 's'} require replenishment`}
             </p>
           </div>
@@ -101,13 +93,13 @@ export function LowStockProductList({
             </div>
             <h4 className="text-sm font-semibold text-slate-800">Healthy Stock Levels</h4>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              No products currently match this filter. Inventory levels are operating above minimum thresholds.
+              No products currently match this filter. Inventory levels are healthy.
             </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100 max-h-[360px] overflow-y-auto">
             {displayedProducts.map((p) => {
-              const isOut = p.alertStatus === 'OUT_OF_STOCK';
+              const isOut = p.stock <= 0;
               return (
                 <div
                   key={p.id}
@@ -132,17 +124,14 @@ export function LowStockProductList({
                       <h4 className="text-xs font-semibold text-slate-900 line-clamp-1">{p.name}</h4>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
-                      <span className="font-mono text-slate-600">SKU: {p.sku}</span>
-                      <span>&bull;</span>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
                       <span>Category: {p.category?.name || 'Uncategorized'}</span>
                       <span>&bull;</span>
-                      <span>Price: {formatCurrency(Number(p.sellingPrice), currencySymbol)}</span>
+                      <span>Price: ₹{Number(p.sellingPrice).toFixed(2)}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
-                    {/* Stock balance indicator */}
                     <div className="text-right">
                       <div className="flex items-center gap-1 justify-end">
                         <span
@@ -150,17 +139,16 @@ export function LowStockProductList({
                             isOut ? 'text-rose-600' : 'text-amber-600'
                           }`}
                         >
-                          {p.stock} {p.unit}
+                          {p.stock} units
                         </span>
-                        <span className="text-[11px] text-slate-400">/ min {p.minStockAlert}</span>
+                        <span className="text-[11px] text-slate-400">/ min {p.minStock}</span>
                       </div>
                       <p className="text-[10px] text-slate-400">
-                        {isOut ? '0 units available' : `${p.stock} remaining`}
+                        {isOut ? 'Zero stock available' : `${p.stock} remaining`}
                       </p>
                     </div>
 
-                    {/* Quick Restock Link */}
-                    <Link href={`/inventory?search=${encodeURIComponent(p.sku)}`}>
+                    <Link href={`/inventory?search=${encodeURIComponent(p.name)}`}>
                       <Button
                         size="sm"
                         variant={isOut ? 'default' : 'outline'}
@@ -170,7 +158,7 @@ export function LowStockProductList({
                             : 'text-slate-700 hover:bg-slate-100'
                         }`}
                       >
-                        <span>Restock</span>
+                        <span>Add Stock</span>
                         <ArrowRight className="h-3 w-3" />
                       </Button>
                     </Link>
@@ -182,14 +170,12 @@ export function LowStockProductList({
         )}
 
         <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>
-            {displayedProducts.length} of {totalCount} alert items shown
-          </span>
+          <span>{displayedProducts.length} of {totalCount} items needing attention</span>
           <Link
-            href="/inventory?filter=low_stock"
+            href="/inventory"
             className="font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
           >
-            View Full Inventory Ledger
+            Manage Inventory
             <ExternalLink className="h-3 w-3" />
           </Link>
         </div>

@@ -1,92 +1,39 @@
 'use server';
 
-import { createCategorySchema, updateCategorySchema } from '@/schemas/category.schema';
-import { categoryService } from '@/services/category.service';
-import { requirePermission } from '@/lib/auth';
-import { ActionResult, successResult, handleActionError } from '@/lib/errors';
+import prisma from '@/lib/prisma';
+import { categorySchema } from '@/schemas/category.schema';
+import { requireUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
-export async function getCategoriesAction(search?: string) {
+export async function createCategoryAction(data: unknown) {
   try {
-    const categories = await categoryService.listCategories(search);
-    return successResult(categories);
-  } catch (err) {
-    return handleActionError(err);
+    await requireUser();
+    const { name } = categorySchema.parse(data);
+    const category = await prisma.category.create({
+      data: { name: name.trim() },
+    });
+    revalidatePath('/categories');
+    revalidatePath('/products');
+    return { success: true, data: category };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to create category';
+    return { success: false, error: message };
   }
 }
 
-export async function createCategoryAction(data: unknown): Promise<ActionResult<{ id: string }>> {
+export async function deleteCategoryAction(id: string) {
   try {
-    const user = await requirePermission('products:write');
-    const validated = createCategorySchema.parse(data);
-
-    const category = await categoryService.createCategory(validated, user.id);
-
+    await requireUser();
+    const count = await prisma.product.count({ where: { categoryId: id } });
+    if (count > 0) {
+      return { success: false, error: 'Cannot delete category containing products. Reassign products first.' };
+    }
+    await prisma.category.delete({ where: { id } });
     revalidatePath('/categories');
     revalidatePath('/products');
-    revalidatePath('/pos');
-    revalidatePath('/');
-
-    return successResult({ id: category.id });
-  } catch (err) {
-    return handleActionError(err);
-  }
-}
-
-export async function updateCategoryAction(
-  id: string,
-  data: unknown
-): Promise<ActionResult> {
-  try {
-    const user = await requirePermission('products:write');
-    const validated = updateCategorySchema.parse(data);
-
-    await categoryService.updateCategory(id, validated, user.id);
-
-    revalidatePath('/categories');
-    revalidatePath('/products');
-    revalidatePath('/pos');
-    revalidatePath('/');
-
-    return successResult(undefined);
-  } catch (err) {
-    return handleActionError(err);
-  }
-}
-
-export async function deleteCategoryAction(id: string): Promise<ActionResult> {
-  try {
-    const user = await requirePermission('products:delete');
-
-    await categoryService.deleteCategory(id, user.id);
-
-    revalidatePath('/categories');
-    revalidatePath('/products');
-    revalidatePath('/pos');
-    revalidatePath('/');
-
-    return successResult(undefined);
-  } catch (err) {
-    return handleActionError(err);
-  }
-}
-
-export async function toggleCategoryStatusAction(
-  id: string,
-  isActive: boolean
-): Promise<ActionResult> {
-  try {
-    const user = await requirePermission('products:write');
-
-    await categoryService.toggleStatus(id, isActive, user.id);
-
-    revalidatePath('/categories');
-    revalidatePath('/products');
-    revalidatePath('/pos');
-    revalidatePath('/');
-
-    return successResult(undefined);
-  } catch (err) {
-    return handleActionError(err);
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete category';
+    return { success: false, error: message };
   }
 }

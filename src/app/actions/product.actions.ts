@@ -1,108 +1,70 @@
 'use server';
 
 import { createProductSchema, updateProductSchema } from '@/schemas/product.schema';
-import { productService } from '@/services/product.service';
-import { requirePermission } from '@/lib/auth';
-import { ActionResult, successResult, handleActionError } from '@/lib/errors';
+import { ProductService } from '@/services/product.service';
+import { requireUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
-/**
- * Server action to create a new product.
- * Enforces 'products:write' permission and validates with Zod.
- */
-export async function createProductAction(data: unknown): Promise<ActionResult<{ id: string }>> {
+export async function createProductAction(data: unknown) {
   try {
-    const user = await requirePermission('products:write');
+    await requireUser();
     const validated = createProductSchema.parse(data);
-
-    const product = await productService.createProduct(validated, user.id);
-
+    const product = await ProductService.createProduct(validated);
     revalidatePath('/products');
-    revalidatePath(`/products/${product.id}`);
     revalidatePath('/inventory');
-    revalidatePath('/pos');
+    revalidatePath('/sales');
+    revalidatePath('/reports');
     revalidatePath('/');
-
-    return successResult({ id: product.id });
+    return { success: true, data: product };
   } catch (err: unknown) {
-    return handleActionError(err);
+    const message = err instanceof Error ? err.message : 'Failed to create product';
+    return { success: false, error: message };
   }
 }
 
-/**
- * Server action to update existing product details.
- * Enforces 'products:write' permission. Stock edits are strictly prohibited.
- */
-export async function updateProductAction(id: string, data: unknown): Promise<ActionResult> {
+export async function updateProductAction(data: unknown) {
   try {
-    const user = await requirePermission('products:write');
+    await requireUser();
     const validated = updateProductSchema.parse(data);
-
-    await productService.updateProduct(id, validated, user.id);
-
+    const { id, ...rest } = validated;
+    const product = await ProductService.updateProduct(id, rest);
     revalidatePath('/products');
-    revalidatePath(`/products/${id}`);
     revalidatePath('/inventory');
-    revalidatePath('/pos');
+    revalidatePath('/sales');
     revalidatePath('/');
-
-    return successResult(undefined);
+    return { success: true, data: product };
   } catch (err: unknown) {
-    return handleActionError(err);
+    const message = err instanceof Error ? err.message : 'Failed to update product';
+    return { success: false, error: message };
   }
 }
 
-/**
- * Server action to deactivate a product (soft-deactivate).
- * Enforces 'products:delete' permission.
- */
-export async function deactivateProductAction(id: string): Promise<ActionResult> {
+export async function toggleProductAction(id: string) {
   try {
-    const user = await requirePermission('products:delete');
-
-    await productService.deactivateProduct(id, user.id);
-
+    await requireUser();
+    const product = await ProductService.toggleActive(id);
     revalidatePath('/products');
-    revalidatePath(`/products/${id}`);
     revalidatePath('/inventory');
-    revalidatePath('/pos');
+    revalidatePath('/sales');
     revalidatePath('/');
-
-    return successResult(undefined);
+    return { success: true, data: product };
   } catch (err: unknown) {
-    return handleActionError(err);
+    const message = err instanceof Error ? err.message : 'Failed to toggle product status';
+    return { success: false, error: message };
   }
 }
 
-/**
- * Server action to reactivate a previously deactivated product.
- * Enforces 'products:write' permission.
- */
-export async function reactivateProductAction(id: string): Promise<ActionResult> {
+export async function deleteProductAction(id: string) {
   try {
-    const user = await requirePermission('products:write');
-
-    await productService.reactivateProduct(id, user.id);
-
+    await requireUser();
+    await ProductService.deleteProduct(id);
     revalidatePath('/products');
-    revalidatePath(`/products/${id}`);
     revalidatePath('/inventory');
-    revalidatePath('/pos');
+    revalidatePath('/sales');
     revalidatePath('/');
-
-    return successResult(undefined);
+    return { success: true };
   } catch (err: unknown) {
-    return handleActionError(err);
-  }
-}
-
-/**
- * Server action to toggle product active status
- */
-export async function toggleProductStatusAction(id: string, isActive: boolean): Promise<ActionResult> {
-  if (isActive) {
-    return reactivateProductAction(id);
-  } else {
-    return deactivateProductAction(id);
+    const message = err instanceof Error ? err.message : 'Failed to delete product';
+    return { success: false, error: message };
   }
 }

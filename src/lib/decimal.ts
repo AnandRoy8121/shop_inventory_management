@@ -45,9 +45,9 @@ export function toNumber(val: Numeric | null | undefined, places = 2): number {
   return roundDecimal(toDecimal(val), places).toNumber();
 }
 
-export function formatCurrency(val: Numeric | null | undefined, currencySymbol = '$'): string {
+export function formatCurrency(val: Numeric | null | undefined, currencySymbol = '₹'): string {
   const num = toNumber(val);
-  return `${currencySymbol}${num.toLocaleString('en-US', {
+  return `${currencySymbol}${num.toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

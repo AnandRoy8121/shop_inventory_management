@@ -1,42 +1,40 @@
 'use server';
 
-import { stockAdjustmentSchema } from '@/schemas/inventory.schema';
-import { inventoryService } from '@/services/inventory.service';
-import { requirePermission } from '@/lib/auth';
-import { ActionResult, successResult, handleActionError } from '@/lib/errors';
+import { addStockSchema, updateStockSchema } from '@/schemas/inventory.schema';
+import { InventoryService } from '@/services/inventory.service';
+import { requireUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
-/**
- * Server action to adjust inventory stock (increase or decrease)
- * Guarded by 'inventory:adjust' permission.
- */
-export async function adjustStockAction(
-  data: unknown
-): Promise<ActionResult<{ stockAfter: number }>> {
+export async function addStockAction(data: unknown) {
   try {
-    const user = await requirePermission('inventory:adjust');
-    const validated = stockAdjustmentSchema.parse(data);
-
-    const result = await inventoryService.adjustStock({
-      productId: validated.productId,
-      operation: validated.operation,
-      quantity: validated.quantity,
-      reason: validated.reason,
-      reasonCategory: validated.reasonCategory,
-      referenceId: validated.referenceId,
-      type: validated.type,
-      userId: user.id,
-    });
-
+    await requireUser();
+    const { productId, quantity, notes } = addStockSchema.parse(data);
+    const updated = await InventoryService.addStock(productId, quantity, notes);
     revalidatePath('/inventory');
-    revalidatePath('/inventory/movements');
     revalidatePath('/products');
-    revalidatePath(`/products/${validated.productId}`);
-    revalidatePath('/pos');
+    revalidatePath('/sales');
+    revalidatePath('/reports');
     revalidatePath('/');
-
-    return successResult({ stockAfter: result.movement.stockAfter });
+    return { success: true, data: updated };
   } catch (err: unknown) {
-    return handleActionError(err);
+    const message = err instanceof Error ? err.message : 'Failed to add stock';
+    return { success: false, error: message };
+  }
+}
+
+export async function updateStockAction(data: unknown) {
+  try {
+    await requireUser();
+    const { productId, stock, notes } = updateStockSchema.parse(data);
+    const updated = await InventoryService.updateStock(productId, stock, notes);
+    revalidatePath('/inventory');
+    revalidatePath('/products');
+    revalidatePath('/sales');
+    revalidatePath('/reports');
+    revalidatePath('/');
+    return { success: true, data: updated };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to update stock';
+    return { success: false, error: message };
   }
 }

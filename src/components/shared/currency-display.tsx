@@ -12,7 +12,7 @@ export interface CurrencyDisplayProps {
 
 export function CurrencyDisplay({
   amount,
-  currencySymbol = '$',
+  currencySymbol = '₹',
   tone = 'neutral',
   size = 'md',
   className,

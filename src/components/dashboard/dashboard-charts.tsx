@@ -37,7 +37,7 @@ const CATEGORY_COLORS = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ec4899', 
 export function DashboardCharts({
   timeSeriesData,
   categoryBreakdown,
-  currencySymbol = '$',
+  currencySymbol = '₹',
 }: DashboardChartsProps) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

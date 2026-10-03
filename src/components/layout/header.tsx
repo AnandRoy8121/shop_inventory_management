@@ -6,7 +6,6 @@ import { Menu, AlertCircle, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Breadcrumbs } from '@/components/shared/breadcrumbs';
 import { UserMenu } from '@/components/shared/user-menu';
-import { Role } from '@prisma/client';
 
 export interface HeaderProps {
   title?: string;
@@ -16,7 +15,6 @@ export interface HeaderProps {
   user?: {
     name: string;
     email: string;
-    role: Role;
   };
 }
 
@@ -41,7 +39,7 @@ export function Header({ lowStockCount = 0, onMenuToggle, user }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right side: Stock alerts pill, POS button, and User Menu */}
+      {/* Right side: Stock alerts pill, Record Sale button, and User Menu */}
       <div className="flex items-center gap-2.5 sm:gap-3">
         {lowStockCount > 0 && (
           <Link href="/inventory">
@@ -53,13 +51,13 @@ export function Header({ lowStockCount = 0, onMenuToggle, user }: HeaderProps) {
           </Link>
         )}
 
-        <Link href="/pos" className="hidden sm:block">
+        <Link href="/sales" className="hidden sm:block">
           <Button
             size="sm"
             className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 shadow-xs h-8 text-xs font-semibold"
           >
             <ShoppingCart className="h-3.5 w-3.5" />
-            <span>POS</span>
+            <span>Record Sale</span>
           </Button>
         </Link>
 
